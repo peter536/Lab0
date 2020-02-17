@@ -1,4 +1,3 @@
-
 import os
 import numpy as np
 import tensorflow as tf
@@ -10,10 +9,10 @@ import random
 # Setting random seeds to keep everything deterministic.
 random.seed(1618)
 np.random.seed(1618)
-tf.set_random_seed(1618)
+tf.random.set_seed(1618)
 
 # Disable some troublesome logging.
-tf.logging.set_verbosity(tf.logging.ERROR)
+tf.compat.v1.logging.set_verbosity(tf.compat.v1.logging.ERROR)
 os.environ['TF_CPP_MIN_LOG_LEVEL'] = '2'
 
 # Information on dataset.
@@ -21,9 +20,9 @@ NUM_CLASSES = 10
 IMAGE_SIZE = 784
 
 # Use these to set the algorithm to use.
-ALGORITHM = "guesser"
+#ALGORITHM = "guesser"
 #ALGORITHM = "custom_net"
-#ALGORITHM = "tf_net"
+ALGORITHM = "tf_net"
 
 
 
@@ -40,11 +39,13 @@ class NeuralNetwork_2Layer():
 
     # Activation function.
     def __sigmoid(self, x):
-        pass   #TODO: implement
+        return (1 / (1 + np.exp(-x)))
+        #pass   #TODO: implement
 
     # Activation prime function.
     def __sigmoidDerivative(self, x):
-        pass   #TODO: implement
+        return self.__sigmoid(x) * (1 - self.__sigmoid(x))
+        #pass   #TODO: implement
 
     # Batch generator for mini-batches. Not randomized.
     def __batchGenerator(self, l, n):
@@ -52,7 +53,29 @@ class NeuralNetwork_2Layer():
             yield l[i : i + n]
 
     # Training with backpropagation.
-    def train(self, xVals, yVals, epochs = 100000, minibatches = True, mbs = 100):
+    def train(self, xVals, yVals, epochs = 40, minibatches = True, mbs = 100):
+        ####### implement minibatching ###########
+        # For a given number of epochs
+        for i in range(epochs):
+
+            # do a forward pass
+            layer1, layer2 = self.__forward(xVals)
+            
+            # calculate layer 2 error and delta
+            layer2_error = yVals - layer2
+            layer2_delta = layer2_error * self.__sigmoidDerivative(layer2)
+
+            # calculate layer 1 error and delta, given layer 2 delta
+            layer1_error = np.dot(layer2_delta, self.W2.T)
+            layer1_delta = layer1_error * self.__sigmoidDerivative(layer1)
+
+            # change the weights!
+            self.W2 += np.dot(layer1.T, layer2_delta) * self.lr
+            self.W1 += np.dot(xVals.T, layer1_delta) * self.lr
+            
+            if (i % 20 == 0):
+                print("Epoch %d out of 30,000 done" % i)
+        return
         pass                                   #TODO: Implement backprop. allow minibatches. mbs should specify the size of each minibatch.
 
     # Forward pass.
@@ -93,7 +116,11 @@ def getRawData():
 
 
 def preprocessData(raw):
-    ((xTrain, yTrain), (xTest, yTest)) = raw            #TODO: Add range reduction here (0-255 ==> 0.0-1.0).
+    ((xTrain, yTrain), (xTest, yTest)) = raw            #TODO: Add range reduction here (0-255 ==> 0.0-1.0) ## DONE
+    xTrain = xTrain / 255.0
+    xTest = xTest / 255.0
+    xTrain = xTrain.reshape(xTrain.shape[0], IMAGE_SIZE)
+    xTest = xTest.reshape(xTest.shape[0], IMAGE_SIZE) 
     yTrainP = to_categorical(yTrain, NUM_CLASSES)
     yTestP = to_categorical(yTest, NUM_CLASSES)
     print("New shape of xTrain dataset: %s." % str(xTrain.shape))
@@ -110,12 +137,17 @@ def trainModel(data):
         return None   # Guesser has no model, as it is just guessing.
     elif ALGORITHM == "custom_net":
         print("Building and training Custom_NN.")
-        print("Not yet implemented.")                   #TODO: Write code to build and train your custon neural net.
-        return None
+        #print("Not yet implemented.")                   #TODO: Write code to build and train your custom neural net.
+        ann = NeuralNetwork_2Layer(IMAGE_SIZE, NUM_CLASSES, 512)
+        ann.train(xTrain, yTrain)
+        return ann
     elif ALGORITHM == "tf_net":
         print("Building and training TF_NN.")
-        print("Not yet implemented.")                   #TODO: Write code to build and train your keras neural net.
-        return None
+        #print("Not yet implemented.")                   #TODO: Write code to build and train your keras neural net.
+        ann = tf.keras.models.Sequential([tf.keras.layers.Dense(512, activation=tf.nn.sigmoid), tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.sigmoid)])
+        ann.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+        ann.fit(xTrain, yTrain, epochs=5, batch_size=128)
+        return (ann)
     else:
         raise ValueError("Algorithm not recognized.")
 
@@ -126,12 +158,15 @@ def runModel(data, model):
         return guesserClassifier(data)
     elif ALGORITHM == "custom_net":
         print("Testing Custom_NN.")
-        print("Not yet implemented.")                   #TODO: Write code to run your custon neural net.
-        return None
+        print("Not yet implemented.")                   #TODO: Write code to run your custom neural net.
+        #data_Flat = data.reshape(data.shape[0], (data.shape[1] * data.shape[2]))
+        preds = model.predict(data)
+        return preds
     elif ALGORITHM == "tf_net":
         print("Testing TF_NN.")
-        print("Not yet implemented.")                   #TODO: Write code to run your keras neural net.
-        return None
+        preds = to_categorical(model.predict(data, batch_size=128), NUM_CLASSES)
+        #print("Not yet implemented.")                   #TODO: Write code to run your keras neural net.
+        return preds
     else:
         raise ValueError("Algorithm not recognized.")
 
