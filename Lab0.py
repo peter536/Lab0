@@ -57,21 +57,23 @@ class NeuralNetwork_2Layer():
         ####### implement minibatching ###########
         # For a given number of epochs
         for i in range(epochs):
-
-            # do a forward pass
-            layer1, layer2 = self.__forward(xVals)
+            x_batches = self.__batchGenerator(xVals, mbs)
+            y_batches = self.__batchGenerator(yVals, mbs)
+            for minibatch in xbatches:
+                # do a forward pass
+                layer1, layer2 = self.__forward(minibatch)
             
-            # calculate layer 2 error and delta
-            layer2_error = yVals - layer2
-            layer2_delta = layer2_error * self.__sigmoidDerivative(layer2)
+                # calculate layer 2 error and delta
+                layer2_error = yVals - layer2
+                layer2_delta = layer2_error * self.__sigmoidDerivative(layer2)
 
-            # calculate layer 1 error and delta, given layer 2 delta
-            layer1_error = np.dot(layer2_delta, self.W2.T)
-            layer1_delta = layer1_error * self.__sigmoidDerivative(layer1)
+                # calculate layer 1 error and delta, given layer 2 delta
+                layer1_error = np.dot(layer2_delta, self.W2.T)
+                layer1_delta = layer1_error * self.__sigmoidDerivative(layer1)
 
-            # change the weights!
-            self.W2 += np.dot(layer1.T, layer2_delta) * self.lr
-            self.W1 += np.dot(xVals.T, layer1_delta) * self.lr
+                # change the weights!
+                self.W2 += np.dot(layer1.T, layer2_delta) * self.lr
+                self.W1 += np.dot(minibatch.T, layer1_delta) * self.lr
             
             if (i % 20 == 0):
                 print("Epoch %d out of 30,000 done" % i)
@@ -117,10 +119,9 @@ def getRawData():
 
 def preprocessData(raw):
     ((xTrain, yTrain), (xTest, yTest)) = raw            #TODO: Add range reduction here (0-255 ==> 0.0-1.0) ## DONE
-    xTrain = xTrain / 255.0
-    xTest = xTest / 255.0
     xTrain = xTrain.reshape(xTrain.shape[0], IMAGE_SIZE)
     xTest = xTest.reshape(xTest.shape[0], IMAGE_SIZE) 
+    xTrain, xTest = xTrain / 255.0, xTest / 255.0
     yTrainP = to_categorical(yTrain, NUM_CLASSES)
     yTestP = to_categorical(yTest, NUM_CLASSES)
     print("New shape of xTrain dataset: %s." % str(xTrain.shape))
@@ -144,10 +145,10 @@ def trainModel(data):
     elif ALGORITHM == "tf_net":
         print("Building and training TF_NN.")
         #print("Not yet implemented.")                   #TODO: Write code to build and train your keras neural net.
-        ann = tf.keras.models.Sequential([tf.keras.layers.Dense(512, activation=tf.nn.sigmoid), tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.sigmoid)])
-        ann.compile(optimizer='adam', loss='mean_squared_error', metrics=['accuracy'])
+        ann = tf.keras.models.Sequential([tf.keras.layers.Dense(512, activation=tf.nn.sigmoid), tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.softmax)])
+        ann.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         ann.fit(xTrain, yTrain, epochs=5, batch_size=128)
-        return (ann)
+        return ann
     else:
         raise ValueError("Algorithm not recognized.")
 
@@ -164,9 +165,14 @@ def runModel(data, model):
         return preds
     elif ALGORITHM == "tf_net":
         print("Testing TF_NN.")
-        preds = to_categorical(model.predict(data, batch_size=128), NUM_CLASSES)
+        preds = model.predict(data)
+        answers = []
+        for prediction in preds:
+            p = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            p[np.argmax(prediction)] = 1
+            answers.append(p)
         #print("Not yet implemented.")                   #TODO: Write code to run your keras neural net.
-        return preds
+	return np.array(answers)
     else:
         raise ValueError("Algorithm not recognized.")
 
@@ -174,9 +180,12 @@ def runModel(data, model):
 
 def evalResults(data, preds):   #TODO: Add F1 score confusion matrix here.
     xTest, yTest = data
-    acc = 0
+    acc = 0.
     for i in range(preds.shape[0]):
+        # print("pred: {}".format(preds[i]))
+        # print("actual: {}".format(yTest[i]))
         if np.array_equal(preds[i], yTest[i]):   acc = acc + 1
+    #print("%d" % acc)
     accuracy = acc / preds.shape[0]
     print("Classifier algorithm: %s" % ALGORITHM)
     print("Classifier accuracy: %f%%" % (accuracy * 100))
