@@ -20,12 +20,77 @@ IMAGE_SIZE = 784
 
 # Use these to set the algorithm to use.
 #ALGORITHM = "guesser"
-ALGORITHM = "custom_net"
+#ALGORITHM = "custom_net"
 #ALGORITHM = "tf_net"
+ALGORITHM = "custom_net_3layer"
+
+class NeuralNetwork_3Layer():
+    def __init__(self, inputSize, outputSize, neuronsPerLayer, learningRate = 0.1):
+        self.inputSize = inputSize
+        self.outputSize = outputSize
+        self.neuronsPerLayer = neuronsPerLayer
+        self.lr = learningRate
+        self.W1 = np.random.randn(self.inputSize, self.neuronsPerLayer)
+        self.W2 = np.random.randn(self.neuronsPerLayer, self.neuronsPerLayer)
+        self.W3 = np.random.randn(self.neuronsPerLayer, self.outputSize)
+   
+    # Activation function.
+    def __sigmoid(self, x):
+        return (1 / (1 + np.exp(-x)))
+
+    # Activation prime function.
+    def __sigmoidDerivative(self, x):
+        return self.__sigmoid(x) * (1 - self.__sigmoid(x))
+
+    # Batch generator for mini-batches. Not randomized.
+    def __batchGenerator(self, l, n):
+        for i in range(0, len(l), n):
+            yield l[i : i + n]
+
+    # Training with backpropagation.
+    def train(self, xVals, yVals, epochs = 5, minibatches = True, mbs = 100):
+        # For a given number of epochs
+        for i in range(epochs):
+            x_batches = self.__batchGenerator(xVals, mbs)
+            y_batches = self.__batchGenerator(yVals, mbs)
+            for j in range(xVals.shape[0] / mbs):
+                # do a forward pass
+                xb_next = next(x_batches)
+                yb_next = next(y_batches)
+                layer1, layer2, layer3 = self.__forward(xb_next)            
 
 
+                # calculate layer 3 error and delta
+                layer3_error = yb_next - layer3
+                layer3_delta = layer3_error * self.__sigmoidDerivative(layer3)
 
+                #calculate layer 2 error and delta
+                layer2_error = np.dot(layer3_delta, self.W3.T)
+                layer2_delta = layer2_error * self.__sigmoidDerivative(layer2)
 
+                # calculate layer 1 error and delta, given layer 2 delta
+                layer1_error = np.dot(layer2_delta, self.W2.T)
+                layer1_delta = layer1_error * self.__sigmoidDerivative(layer1)
+
+                # change the weights!
+                self.W3 += np.dot(layer2.T, layer3_delta) * self.lr
+                self.W2 += np.dot(layer1.T, layer2_delta) * self.lr
+                self.W1 += np.dot(xb_next.T, layer1_delta) * self.lr
+            
+            print("Epoch %d/%d done " % ((i + 1), epochs))
+        return
+
+    # Forward pass.
+    def __forward(self, input):
+        layer1 = self.__sigmoid(np.dot(input, self.W1))
+        layer2 = self.__sigmoid(np.dot(layer1, self.W2))
+        layer3 = self.__sigmoid(np.dot(layer2, self.W3))
+        return layer1, layer2, layer3
+
+    # Predict.
+    def predict(self, xVals):
+        _, _, layer3 = self.__forward(xVals)
+        return layer3
 
 class NeuralNetwork_2Layer():
     def __init__(self, inputSize, outputSize, neuronsPerLayer, learningRate = 0.1):
@@ -143,6 +208,11 @@ def trainModel(data):
         ann.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         ann.fit(xTrain, yTrain, epochs=5, batch_size=128)
         return ann
+    elif ALGORITHM == "custom_net_3layer":
+        print("Building and training Custom_NN_3Layer.")
+        ann = NeuralNetwork_3Layer(IMAGE_SIZE, NUM_CLASSES, 512)
+        ann.train(xTrain, yTrain)
+        return ann
     else:
         raise ValueError("Algorithm not recognized.")
 
@@ -169,6 +239,15 @@ def runModel(data, model):
             p[np.argmax(prediction)] = 1
             answers.append(p)
 	return np.array(answers)
+    elif ALGORITHM == "custom_net_3layer":
+        print("Testing Custom_NN_3Layer.")
+        preds = model.predict(data)
+        answers = []
+        for prediction in preds:
+            p = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            p[np.argmax(prediction)] = 1
+            answers.append(p)
+        return np.array(answers)
     else:
         raise ValueError("Algorithm not recognized.")
 
