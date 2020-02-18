@@ -5,7 +5,6 @@ from tensorflow import keras
 from tensorflow.keras.utils import to_categorical
 import random
 
-
 # Setting random seeds to keep everything deterministic.
 random.seed(1618)
 np.random.seed(1618)
@@ -52,7 +51,6 @@ class NeuralNetwork_2Layer():
 
     # Training with backpropagation.
     def train(self, xVals, yVals, epochs = 5, minibatches = True, mbs = 100):
-        ####### implement minibatching ###########
         # For a given number of epochs
         for i in range(epochs):
             x_batches = self.__batchGenerator(xVals, mbs)
@@ -75,8 +73,7 @@ class NeuralNetwork_2Layer():
                 self.W2 += np.dot(layer1.T, layer2_delta) * self.lr
                 self.W1 += np.dot(xb_next.T, layer1_delta) * self.lr
             
-            #if (i % 20 == 0):
-                #print("Epoch %d out of 30,000 done" % i)
+            print("Epoch %d/%d done " % ((i + 1), epochs))
         return
 
     # Forward pass.
@@ -117,7 +114,7 @@ def getRawData():
 
 
 def preprocessData(raw):
-    ((xTrain, yTrain), (xTest, yTest)) = raw            #TODO: Add range reduction here (0-255 ==> 0.0-1.0) ## DONE
+    ((xTrain, yTrain), (xTest, yTest)) = raw
     xTrain = xTrain.reshape(xTrain.shape[0], IMAGE_SIZE)
     xTest = xTest.reshape(xTest.shape[0], IMAGE_SIZE) 
     xTrain, xTest = xTrain / 255.0, xTest / 255.0
@@ -137,13 +134,11 @@ def trainModel(data):
         return None   # Guesser has no model, as it is just guessing.
     elif ALGORITHM == "custom_net":
         print("Building and training Custom_NN.")
-        #print("Not yet implemented.")
         ann = NeuralNetwork_2Layer(IMAGE_SIZE, NUM_CLASSES, 512)
         ann.train(xTrain, yTrain)
         return ann
     elif ALGORITHM == "tf_net":
         print("Building and training TF_NN.")
-        #print("Not yet implemented.")
         ann = tf.keras.models.Sequential([tf.keras.layers.Dense(512, activation=tf.nn.sigmoid), tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.softmax)])
         ann.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         ann.fit(xTrain, yTrain, epochs=5, batch_size=128)
@@ -158,8 +153,6 @@ def runModel(data, model):
         return guesserClassifier(data)
     elif ALGORITHM == "custom_net":
         print("Testing Custom_NN.")
-        print("Not yet implemented.")
-        #data_Flat = data.reshape(data.shape[0], (data.shape[1] * data.shape[2]))
         preds = model.predict(data)
         answers = []
         for prediction in preds:
@@ -175,19 +168,27 @@ def runModel(data, model):
             p = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
             p[np.argmax(prediction)] = 1
             answers.append(p)
-        #print("Not yet implemented.")                   #TODO: Write code to run your keras neural net.
 	return np.array(answers)
     else:
         raise ValueError("Algorithm not recognized.")
 
 
 
-def evalResults(data, preds):   #TODO: Add F1 score confusion matrix here.
+def evalResults(data, preds):
     xTest, yTest = data
+    f1confusion = np.zeros((NUM_CLASSES, NUM_CLASSES))
+    for i in range(yTest.shape[0]):
+        vectorA = yTest[i]
+        vectorP = preds[i]
+        indexA = np.argmax(vectorA)
+        indexP = np.argmax(vectorP)
+        f1confusion[indexA][indexP] += 1
+    print("Printing F1 Confusion Matrix below Actual\Predicted")
+    np.set_printoptions(suppress=True)
+    print(np.matrix(f1confusion))
     acc = 0.
     for i in range(preds.shape[0]):
         if np.array_equal(preds[i], yTest[i]):   acc = acc + 1
-    #print("%d" % acc)
     accuracy = acc / preds.shape[0]
     print("Classifier algorithm: %s" % ALGORITHM)
     print("Classifier accuracy: %f%%" % (accuracy * 100))
