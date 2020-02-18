@@ -21,8 +21,8 @@ IMAGE_SIZE = 784
 
 # Use these to set the algorithm to use.
 #ALGORITHM = "guesser"
-#ALGORITHM = "custom_net"
-ALGORITHM = "tf_net"
+ALGORITHM = "custom_net"
+#ALGORITHM = "tf_net"
 
 
 
@@ -40,12 +40,10 @@ class NeuralNetwork_2Layer():
     # Activation function.
     def __sigmoid(self, x):
         return (1 / (1 + np.exp(-x)))
-        #pass   #TODO: implement
 
     # Activation prime function.
     def __sigmoidDerivative(self, x):
         return self.__sigmoid(x) * (1 - self.__sigmoid(x))
-        #pass   #TODO: implement
 
     # Batch generator for mini-batches. Not randomized.
     def __batchGenerator(self, l, n):
@@ -53,18 +51,20 @@ class NeuralNetwork_2Layer():
             yield l[i : i + n]
 
     # Training with backpropagation.
-    def train(self, xVals, yVals, epochs = 40, minibatches = True, mbs = 100):
+    def train(self, xVals, yVals, epochs = 5, minibatches = True, mbs = 100):
         ####### implement minibatching ###########
         # For a given number of epochs
         for i in range(epochs):
             x_batches = self.__batchGenerator(xVals, mbs)
             y_batches = self.__batchGenerator(yVals, mbs)
-            for minibatch in xbatches:
+            for j in range(xVals.shape[0] / mbs):
                 # do a forward pass
-                layer1, layer2 = self.__forward(minibatch)
+                xb_next = next(x_batches)
+                yb_next = next(y_batches)
+                layer1, layer2 = self.__forward(xb_next)
             
                 # calculate layer 2 error and delta
-                layer2_error = yVals - layer2
+                layer2_error = yb_next - layer2
                 layer2_delta = layer2_error * self.__sigmoidDerivative(layer2)
 
                 # calculate layer 1 error and delta, given layer 2 delta
@@ -73,12 +73,11 @@ class NeuralNetwork_2Layer():
 
                 # change the weights!
                 self.W2 += np.dot(layer1.T, layer2_delta) * self.lr
-                self.W1 += np.dot(minibatch.T, layer1_delta) * self.lr
+                self.W1 += np.dot(xb_next.T, layer1_delta) * self.lr
             
-            if (i % 20 == 0):
-                print("Epoch %d out of 30,000 done" % i)
+            #if (i % 20 == 0):
+                #print("Epoch %d out of 30,000 done" % i)
         return
-        pass                                   #TODO: Implement backprop. allow minibatches. mbs should specify the size of each minibatch.
 
     # Forward pass.
     def __forward(self, input):
@@ -138,13 +137,13 @@ def trainModel(data):
         return None   # Guesser has no model, as it is just guessing.
     elif ALGORITHM == "custom_net":
         print("Building and training Custom_NN.")
-        #print("Not yet implemented.")                   #TODO: Write code to build and train your custom neural net.
+        #print("Not yet implemented.")
         ann = NeuralNetwork_2Layer(IMAGE_SIZE, NUM_CLASSES, 512)
         ann.train(xTrain, yTrain)
         return ann
     elif ALGORITHM == "tf_net":
         print("Building and training TF_NN.")
-        #print("Not yet implemented.")                   #TODO: Write code to build and train your keras neural net.
+        #print("Not yet implemented.")
         ann = tf.keras.models.Sequential([tf.keras.layers.Dense(512, activation=tf.nn.sigmoid), tf.keras.layers.Dense(NUM_CLASSES, activation=tf.nn.softmax)])
         ann.compile(optimizer='adam', loss='categorical_crossentropy', metrics=['accuracy'])
         ann.fit(xTrain, yTrain, epochs=5, batch_size=128)
@@ -159,10 +158,15 @@ def runModel(data, model):
         return guesserClassifier(data)
     elif ALGORITHM == "custom_net":
         print("Testing Custom_NN.")
-        print("Not yet implemented.")                   #TODO: Write code to run your custom neural net.
+        print("Not yet implemented.")
         #data_Flat = data.reshape(data.shape[0], (data.shape[1] * data.shape[2]))
         preds = model.predict(data)
-        return preds
+        answers = []
+        for prediction in preds:
+            p = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+            p[np.argmax(prediction)] = 1
+            answers.append(p)
+        return np.array(answers)
     elif ALGORITHM == "tf_net":
         print("Testing TF_NN.")
         preds = model.predict(data)
@@ -182,8 +186,6 @@ def evalResults(data, preds):   #TODO: Add F1 score confusion matrix here.
     xTest, yTest = data
     acc = 0.
     for i in range(preds.shape[0]):
-        # print("pred: {}".format(preds[i]))
-        # print("actual: {}".format(yTest[i]))
         if np.array_equal(preds[i], yTest[i]):   acc = acc + 1
     #print("%d" % acc)
     accuracy = acc / preds.shape[0]
